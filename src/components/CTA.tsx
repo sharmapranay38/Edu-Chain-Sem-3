@@ -1,10 +1,11 @@
-
 import React, { useEffect, useRef } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { Button } from "@/components/ui/button";
+import { useNavigate } from 'react-router-dom';
 
 const CTA = () => {
   const sectionRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -30,6 +31,10 @@ const CTA = () => {
     };
   }, []);
 
+  const handleGetStarted = () => {
+    navigate('/dapp');
+  };
+
   return (
     <section id="cta" className="section bg-gray-50">
       <div 
@@ -52,8 +57,8 @@ const CTA = () => {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" className="group">
-                Sign Up Now
+              <Button size="lg" className="group" onClick={handleGetStarted}>
+                Get Started
                 <ArrowRight size={16} className="ml-2 transition-transform group-hover:translate-x-1" />
               </Button>
               <Button size="lg" variant="outline">

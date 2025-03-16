@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Wallet } from 'lucide-react';
+import { Wallet } from "lucide-react";
 
 const DApp = () => {
   const [account, setAccount] = useState<string | null>(null);
@@ -14,7 +14,7 @@ const DApp = () => {
     const storedAccount = localStorage.getItem("connectedAccount");
     if (storedAccount) {
       setAccount(storedAccount);
-      navigate('/dashboard');
+      navigate("/dashboard");
     }
   }, [navigate]);
 
@@ -28,7 +28,7 @@ const DApp = () => {
         // Save the connected account to localStorage
         localStorage.setItem("connectedAccount", accounts[0]);
         // Redirect to dashboard
-        navigate('/dashboard');
+        navigate("/dashboard");
       } catch (error) {
         console.error("Error connecting to MetaMask:", error);
       }
@@ -55,18 +55,23 @@ const DApp = () => {
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="grid place-items-center h-[100vh]">
           <Card className="p-8 max-w-md w-full text-center">
-            <h2 className="text-2xl font-bold mb-6">Welcome to EduBounty dApp</h2>
-            <p className="mb-8">Connect your wallet to access the task dashboard and start earning rewards for educational contributions.</p>
+            <h2 className="text-2xl font-bold mb-6">
+              Welcome to EduBounty dApp
+            </h2>
+            <p className="mb-8">
+              Connect your wallet to access the task dashboard and start earning
+              rewards for educational contributions.
+            </p>
             <div className="flex flex-col items-center">
-              <Button 
-                size="lg" 
+              <Button
+                size="lg"
                 className="w-full flex items-center justify-center gap-2"
                 onClick={connectWallet}
               >
                 <Wallet size={20} />
                 Connect Wallet
               </Button>
-              
+
               {account && (
                 <p className="text-sm text-gray-500 mt-4">
                   Wallet connected! Redirecting to dashboard...

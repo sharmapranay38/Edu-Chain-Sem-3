@@ -3,29 +3,45 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { OCConnect } from "@opencampus/ocid-connect-js";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import DApp from "./pages/DApp";
 import Dashboard from "./pages/Dashboard";
-
+import OCIDDashboard from "./components/OCIDDashboard";
+import Redirect from "./pages/Redirect";
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/dapp" element={<DApp />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  // Configure Open Campus ID authentication
+  const ocidConfig = {
+    redirectUri: window.location.origin + "/redirect",
+    referralCode: "PARTNER6",
+    // Add any other configuration options needed
+    // clientId: "your-client-id", // If required by Open Campus
+  };
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <OCConnect opts={ocidConfig} sandboxMode={true}>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/dapp" element={<DApp />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/ocid-dashboard" element={<OCIDDashboard />} />
+              <Route path="/redirect" element={<Redirect />} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </OCConnect>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;

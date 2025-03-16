@@ -1,18 +1,36 @@
-"use client";
 import { useOCAuth } from "@opencampus/ocid-connect-js";
+import { useEffect, useState } from "react";
 
 export default function LoginButton() {
   const { isInitialized, authState, ocAuth } = useOCAuth();
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Reset loading state when auth state changes
+  useEffect(() => {
+    if (authState?.isAuthenticated) {
+      setIsLoading(false);
+    }
+  }, [authState]);
 
   const handleLogin = async () => {
     try {
+      setIsLoading(true);
       if (ocAuth && typeof ocAuth.signInWithRedirect === "function") {
-        await ocAuth.signInWithRedirect({ state: "opencampus" });
+        // Store a flag to indicate authentication is in progress
+        localStorage.setItem("auth_in_progress", "true");
+        await ocAuth.signInWithRedirect({ 
+          state: "opencampus",
+          // You can add additional parameters here if needed
+        });
       } else {
         console.error("signInWithRedirect method not available:", ocAuth);
+        setIsLoading(false);
       }
     } catch (error) {
       console.error("Login error:", error);
+      setIsLoading(false);
+      // Clear the auth in progress flag on error
+      localStorage.removeItem("auth_in_progress");
     }
   };
 
@@ -30,10 +48,10 @@ export default function LoginButton() {
   if (authState?.isAuthenticated) {
     return (
       <button
-        disabled
-        className="px-4 py-2 bg-green-500 text-white rounded cursor-not-allowed"
+        onClick={() => window.location.href = "/ocid-dashboard"}
+        className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
       >
-        Logged In
+        Dashboard
       </button>
     );
   }
@@ -41,9 +59,14 @@ export default function LoginButton() {
   return (
     <button
       onClick={handleLogin}
-      className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+      disabled={isLoading}
+      className={`px-4 py-2 text-white rounded ${
+        isLoading 
+          ? "bg-blue-400 cursor-not-allowed" 
+          : "bg-blue-500 hover:bg-blue-600"
+      }`}
     >
-      Login with OpenCampus
+      {isLoading ? "Connecting..." : "Login with OpenCampus"}
     </button>
   );
 }

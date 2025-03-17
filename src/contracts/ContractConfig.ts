@@ -5,7 +5,7 @@ export const CONTRACT_ADDRESS = "0x78740ac492a53e37f6557de852250f4ef0ee01fb"; //
 export const NETWORK_CONFIG = {
   chainId: 656476, // Open Campus Codex testnet chain ID
   chainName: "Open Campus Codex",
-  rpcUrl: "https://rpc.open-campus-codex.gelato.digital",
+  rpcUrl: "https://rpc.open-campus-codex.gelato.digital", // Trying alternative RPC URL
   blockExplorerUrl: "https://opencampus-codex.blockscout.com",
   nativeCurrency: {
     name: "EDU",

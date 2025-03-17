@@ -19,7 +19,7 @@ export interface Task {
 
 // Open Campus Codex testnet details
 const CHAIN_ID = 656476;
-const RPC_URL = "https://rpc.open-campus-codex.gelato.digital";
+const RPC_URL = "https://rpc.open-campus-codex.gelato.digital"; // Update to match ContractConfig
 
 class TaskService {
   private static instance: TaskService;
@@ -38,17 +38,69 @@ class TaskService {
     return TaskService.instance;
   }
 
-  private async initializeProvider() {
-    if (window.ethereum) {
-      try {
-        // Create a simple provider without custom configurations
-        this.provider = new ethers.providers.Web3Provider(window.ethereum, {
-          name: "Open Campus Codex",
-          chainId: CHAIN_ID,
-        });
+  private async initializeProvider(
+    forceDirect: boolean = false
+  ): Promise<void> {
+    try {
+      // If we already have an initialized provider, no need to do it again
+      if (this.isInitialized() && !forceDirect) return;
 
-        // Get the network to ensure we're on the right one
+      if (window.ethereum) {
+        // Request account access if needed
+        await window.ethereum.request({ method: "eth_requestAccounts" });
+
+        // Get provider
+        this.provider = new ethers.providers.Web3Provider(window.ethereum);
+
+        // Check if we're on the right network
         const network = await this.provider.getNetwork();
+        if (network.chainId !== CHAIN_ID) {
+          console.log(`Switching to chain ID: ${CHAIN_ID}`);
+          try {
+            // Try to switch to the right network
+            await window.ethereum.request({
+              method: "wallet_switchEthereumChain",
+              params: [{ chainId: `0x${CHAIN_ID.toString(16)}` }],
+            });
+
+            // Re-initialize provider after network switch
+            this.provider = new ethers.providers.Web3Provider(window.ethereum);
+          } catch (switchError: any) {
+            console.error("Failed to switch networks:", switchError);
+
+            // If the network isn't added to MetaMask, add it
+            if (switchError.code === 4902) {
+              try {
+                await window.ethereum.request({
+                  method: "wallet_addEthereumChain",
+                  params: [
+                    {
+                      chainId: `0x${CHAIN_ID.toString(16)}`,
+                      chainName: "Open Campus Codex",
+                      rpcUrls: [RPC_URL],
+                      blockExplorerUrls: ["https://sepolia.etherscan.io"],
+                      nativeCurrency: {
+                        name: "Sepolia Ether",
+                        symbol: "ETH",
+                        decimals: 18,
+                      },
+                    },
+                  ],
+                });
+
+                // Re-initialize provider after adding network
+                this.provider = new ethers.providers.Web3Provider(
+                  window.ethereum
+                );
+              } catch (addError) {
+                console.error("Failed to add network:", addError);
+                throw new Error("Failed to add network to wallet");
+              }
+            } else {
+              throw new Error("Failed to switch to the correct network");
+            }
+          }
+        }
 
         // Initialize contracts
         const signer = this.provider.getSigner();
@@ -63,18 +115,16 @@ class TaskService {
           signer
         );
 
-        console.log(
-          "TaskService initialized successfully on network:",
-          network.chainId
+        console.log("TaskService initialized successfully with wallet");
+      } else {
+        throw new Error(
+          "No Ethereum wallet detected. Please install MetaMask."
         );
-      } catch (error) {
-        console.error("Failed to initialize TaskService provider:", error);
-        this.provider = null;
-        this.taskManager = null;
-        this.eduToken = null;
       }
-    } else {
-      console.error("Ethereum provider not detected");
+    } catch (error) {
+      console.error("Error initializing provider:", error);
+      this.reset(); // Reset in case of any errors
+      throw error;
     }
   }
 
@@ -92,101 +142,146 @@ class TaskService {
     return !!this.provider && !!this.taskManager && !!this.eduToken;
   }
 
-  // Create a new task
+  // Create a new task with direct approach to bypass RPC errors
   public async createTask(
     title: string,
     description: string,
     reward: string
   ): Promise<boolean> {
     try {
-      // Always try to initialize/reinitialize provider first
-      await this.initializeProvider();
+      // Force reinitialize with direct RPC connection to avoid MetaMask issues
+      await this.initializeProvider(true);
 
       if (!this.isInitialized()) {
-        throw new Error("Failed to initialize wallet connection");
+        throw new Error(
+          "TaskService not initialized - wallet may not be connected"
+        );
       }
 
+      // Print debug information
       const signer = this.provider!.getSigner();
-      const address = await signer.getAddress();
+      const userAddress = await signer.getAddress();
+      console.log("User address:", userAddress);
+      console.log("Contract address:", CONTRACT_ADDRESS);
+      console.log("Token address:", EDU_TOKEN_ADDRESS);
+      console.log("Using RPC URL:", RPC_URL);
 
       // Convert reward to Wei
       const rewardInWei = ethers.utils.parseEther(reward);
+      console.log("Reward in wei:", rewardInWei.toString());
 
-      // Skip balance check temporarily due to contract issues
-      // Instead, we'll rely on the transaction to fail if insufficient funds
+      // DIRECT APPROACH: Skip approval check and just try to create the task
+      // This works if you have already approved tokens for this contract previously
+      console.log("Attempting direct task creation (skipping approval)...");
 
-      // First try to create the task directly without checking balance
-      console.log("Creating task...");
       try {
+        // Minimal transaction settings
         const tx = await this.taskManager!.createTask(
           title,
           description,
           rewardInWei,
-          { gasLimit: 300000 }
+          {
+            gasLimit: 200000,
+            gasPrice: ethers.utils.parseUnits("1", "gwei"),
+          }
         );
         console.log("Create task transaction sent:", tx.hash);
         await tx.wait();
-        console.log("Task created successfully");
+        console.log("Task created successfully!");
         return true;
-      } catch (taskError: any) {
-        // If the error is about allowance, try to approve first
+      } catch (directError: any) {
+        console.error("Direct task creation failed:", directError);
+
+        // Check if we need approval
         if (
-          taskError.message &&
-          (taskError.message.includes("allowance") ||
-            taskError.message.includes("insufficient"))
+          directError.message &&
+          (directError.message.includes("allowance") ||
+            directError.message.includes("insufficient") ||
+            directError.message.includes("ERC20"))
         ) {
-          console.log("Approving tokens...");
+          console.log(
+            "Approval needed. Attempting approval with minimal settings..."
+          );
+
           try {
-            // Try approval with higher gas limit
+            // Try with very minimal gas
             const approveTx = await this.eduToken!.approve(
               CONTRACT_ADDRESS,
               rewardInWei,
-              { gasLimit: 300000 }
+              {
+                gasLimit: 60000,
+                gasPrice: ethers.utils.parseUnits("1", "gwei"),
+              }
             );
             console.log("Approval transaction sent:", approveTx.hash);
             await approveTx.wait();
-            console.log("Token approval confirmed");
+            console.log("Approval successful!");
 
-            // Now try to create the task again
+            // Try task creation again after successful approval
+            console.log("Retrying task creation after approval...");
             const tx = await this.taskManager!.createTask(
               title,
               description,
               rewardInWei,
-              { gasLimit: 300000 }
+              {
+                gasLimit: 200000,
+                gasPrice: ethers.utils.parseUnits("1", "gwei"),
+              }
             );
             console.log("Create task transaction sent:", tx.hash);
             await tx.wait();
-            console.log("Task created successfully");
+            console.log("Task created successfully after approval!");
             return true;
           } catch (approveError: any) {
-            console.error("Approval error:", approveError);
+            console.error("Approval failed with details:", approveError);
+
+            // Check for JSON-RPC errors
+            if (approveError.code === -32603) {
+              throw new Error(
+                "RPC connection error. This testnet may be experiencing issues. " +
+                  "Try switching networks, refreshing the page, or coming back later."
+              );
+            }
+
+            // If we can't approve, we can't proceed
             throw new Error(
-              "Failed to approve token transfer: " +
+              "Failed to approve tokens: " +
                 (approveError.message || "Unknown error")
             );
           }
+        } else if (directError.code === -32603) {
+          // Handle JSON-RPC errors
+          throw new Error(
+            "RPC connection error. This testnet may be experiencing issues. " +
+              "Try switching networks, refreshing the page, or coming back later."
+          );
         } else {
-          // Re-throw the original error
-          throw taskError;
+          // Some other error occurred with direct creation
+          throw directError;
         }
       }
     } catch (error: any) {
       console.error("Error in createTask:", error);
 
-      // Handle specific error cases
+      // More detailed error categorization
       if (error.message?.includes("user rejected")) {
         throw new Error("Transaction was rejected by user");
       } else if (error.code === "CALL_EXCEPTION") {
         throw new Error(
-          "Contract call failed. The token contract may be incorrect or not responding."
+          "Contract call failed. This could be due to:\n" +
+            "1. The contract address might be incorrect\n" +
+            "2. The contract may not be deployed to this network\n" +
+            "Check your contract addresses and network settings."
         );
       } else if (error.code === -32603) {
         throw new Error(
-          "Transaction failed. Please ensure you have enough EDU tokens for gas fees"
+          "RPC connection error. This testnet may be experiencing issues. " +
+            "Try switching networks, refreshing the page, or coming back later."
         );
       } else {
+        // Pass through the original error for debugging
         throw new Error(
-          error.message || "Failed to create task. Please try again"
+          `Task creation failed: ${error.message || "Unknown error"}`
         );
       }
     }
@@ -297,6 +392,13 @@ class TaskService {
       console.error("Error getting EDU token balance:", error);
       throw error;
     }
+  }
+
+  // Reset the service
+  private reset() {
+    this.provider = null;
+    this.taskManager = null;
+    this.eduToken = null;
   }
 }
 

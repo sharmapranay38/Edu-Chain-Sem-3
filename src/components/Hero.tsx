@@ -5,12 +5,16 @@ import { useNavigate } from "react-router-dom";
 
 const Hero = () => {
   const navigate = useNavigate();
+  const heroRef = useRef(null);
+  const tokenRef = useRef(null);
 
   const handleGetStarted = () => {
-    navigate("/dapp");
+    navigate("/login");
   };
-  const heroRef = useRef<HTMLDivElement>(null);
-  const tokenRef = useRef<HTMLDivElement>(null);
+
+  const handleLearnMore = () => {
+    navigate("/login");
+  };
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -40,7 +44,7 @@ const Hero = () => {
     const token = tokenRef.current;
     if (!token) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const handleMouseMove = (e) => {
       const rect = token.getBoundingClientRect();
       const x = e.clientX - rect.left - rect.width / 2;
       const y = e.clientY - rect.top - rect.height / 2;
@@ -62,20 +66,22 @@ const Hero = () => {
   }, []);
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden section pt-28">
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-gradient-to-b from-blue-50 to-white pt-28">
       <div
         ref={heroRef}
         className="container mx-auto flex flex-col items-center text-center reveal-animation translate-y-4"
       >
-        <div className="inline-block mb-4 px-3 py-1 rounded-full bg-blue-50 border border-blue-100">
+        <div className="inline-block mb-4 px-3 py-1 rounded-full bg-blue-100 border border-blue-200">
           <span className="text-sm font-medium text-blue-600">
             Introducing EduBounty
           </span>
         </div>
 
         <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 max-w-4xl">
-          <span className="block">Earn Tokens for Learning</span>
-          <span className="block text-gradient">and Contributing</span>
+          <span className="block text-gray-800">Earn Tokens for Learning</span>
+          <span className="block bg-gradient-to-r from-blue-600 to-indigo-600 text-transparent bg-clip-text">
+            and Contributing
+          </span>
         </h1>
 
         <p className="text-lg md:text-xl text-gray-600 max-w-2xl mb-10">
@@ -84,31 +90,30 @@ const Hero = () => {
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 mb-16">
-          <Button size="lg" className="group" onClick={handleGetStarted}>
+          <Button 
+            size="lg" 
+            className="group bg-blue-600 hover:bg-blue-700"
+            onClick={handleGetStarted}
+          >
             Get Started
             <ArrowRight
               size={16}
               className="ml-2 transition-transform group-hover:translate-x-1"
             />
           </Button>
-          <Button size="lg" variant="outline">
+          <Button 
+            size="lg" 
+            variant="outline" 
+            className="border-blue-200 text-blue-600 hover:bg-blue-50"
+            onClick={handleLearnMore}
+          >
             Learn More
           </Button>
         </div>
 
-        <div className="relative w-full max-w-3xl h-64 md:h-80 mt-10">
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background z-10"></div>
-          <div
-            ref={tokenRef}
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 md:w-40 md:h-40 bg-blue-500 rounded-full token-glow flex items-center justify-center transition-transform duration-200 ease-out z-0"
-          >
-            <div className="text-white font-bold text-lg md:text-2xl">EDU</div>
-          </div>
-          <div className="absolute top-4 left-8 w-20 h-20 bg-indigo-400 rounded-full token-glow opacity-60 animate-slow-pulse"></div>
-          <div className="absolute bottom-10 right-10 w-16 h-16 bg-blue-300 rounded-full token-glow opacity-60 animate-slow-pulse"></div>
-          <div className="absolute bottom-20 left-1/4 w-10 h-10 bg-indigo-300 rounded-full token-glow opacity-40 animate-slow-pulse"></div>
-          <div className="absolute top-1/3 right-1/4 w-14 h-14 bg-blue-400 rounded-full token-glow opacity-50 animate-slow-pulse"></div>
-        </div>
+        {/* Abstract shapes */}
+        <div className="absolute -z-10 top-1/3 -left-64 w-96 h-96 bg-blue-100 rounded-full blur-3xl opacity-30"></div>
+        <div className="absolute -z-10 bottom-1/4 -right-64 w-96 h-96 bg-indigo-100 rounded-full blur-3xl opacity-30"></div>
       </div>
     </div>
   );

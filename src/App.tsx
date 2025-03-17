@@ -10,6 +10,7 @@ import DApp from "./pages/DApp";
 import Dashboard from "./pages/Dashboard";
 import OCIDDashboard from "./components/OCIDDashboard";
 import Redirect from "./pages/Redirect";
+import LoginPage from "./components/LoginPage";
 const queryClient = new QueryClient();
 
 const App = () => {
@@ -17,8 +18,9 @@ const App = () => {
   const ocidConfig = {
     redirectUri: window.location.origin + "/redirect",
     referralCode: "PARTNER6",
+    clientId: "edubounty-app", // Added clientId for OCID
+    scope: "openid profile email", // Added scope for OCID
     // Add any other configuration options needed
-    // clientId: "your-client-id", // If required by Open Campus
   };
 
   return (
@@ -35,6 +37,7 @@ const App = () => {
               <Route path="/ocid-dashboard" element={<OCIDDashboard />} />
               <Route path="/redirect" element={<Redirect />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="/login" element={<LoginPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

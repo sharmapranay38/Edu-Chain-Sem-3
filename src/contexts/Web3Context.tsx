@@ -64,7 +64,7 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
         const web3Provider = new ethers.providers.Web3Provider(
           window.ethereum,
           {
-            name: "Open Campus Codex",
+            name: "EDU Chain Testnet",
             chainId: targetChainId,
           }
         );

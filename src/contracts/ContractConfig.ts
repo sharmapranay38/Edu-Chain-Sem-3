@@ -4,7 +4,7 @@ export const CONTRACT_ADDRESS = "0x78740ac492a53e37f6557de852250f4ef0ee01fb"; //
 // Open Campus Codex testnet network configuration
 export const NETWORK_CONFIG = {
   chainId: 656476, // Open Campus Codex testnet chain ID
-  chainName: "Open Campus Codex",
+  chainName: "EDU Chain Testnet",
   rpcUrl: "https://rpc.open-campus-codex.gelato.digital", // Trying alternative RPC URL
   blockExplorerUrl: "https://opencampus-codex.blockscout.com",
   nativeCurrency: {
@@ -15,7 +15,7 @@ export const NETWORK_CONFIG = {
 };
 
 // The address of your EduToken contract on Open Campus Codex testnet
-export const EDU_TOKEN_ADDRESS = "0x7ea6ea49b0b0ae9c5db7907d139d9cd3439afe7b"; // Using checksum-corrected address
+export const EDU_TOKEN_ADDRESS = "0x0ae1c689d9d43329c5179878e6e0832589f348ef"; // Using checksum-corrected address
 
 // ABI of your TaskManager contract
 export const TASK_MANAGER_ABI = [

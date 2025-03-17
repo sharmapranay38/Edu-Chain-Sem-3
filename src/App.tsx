@@ -10,6 +10,9 @@ import DApp from "./pages/DApp";
 import Dashboard from "./pages/Dashboard";
 import OCIDDashboard from "./components/OCIDDashboard";
 import Redirect from "./pages/Redirect";
+import TaskCreation from "./components/TaskCreation";
+import { Web3Provider } from "@/contexts/Web3Context";
+
 const queryClient = new QueryClient();
 
 const App = () => {
@@ -22,25 +25,28 @@ const App = () => {
   };
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <OCConnect opts={ocidConfig} sandboxMode={true}>
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/dapp" element={<DApp />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/ocid-dashboard" element={<OCIDDashboard />} />
-              <Route path="/redirect" element={<Redirect />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </OCConnect>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <Web3Provider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <OCConnect opts={ocidConfig} sandboxMode={true}>
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/dapp" element={<DApp />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/create-task" element={<TaskCreation />} />
+                <Route path="/ocid-dashboard" element={<OCIDDashboard />} />
+                <Route path="/redirect" element={<Redirect />} />
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </OCConnect>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </Web3Provider>
   );
 };
 

@@ -3,151 +3,220 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Award, ArrowRight, Wallet } from "lucide-react";
+import { Clock, Award, ArrowRight, Wallet, Plus, Loader2 } from "lucide-react";
+import { useWeb3 } from "@/contexts/Web3Context";
+import taskService from "@/services/TaskService";
+import { toast } from "@/components/ui/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-// Sample task data
-const sampleTasks = [
-  {
-    id: 1,
-    title: "Create a Smart Contract for Token Distribution",
-    description:
-      "Develop a Solidity smart contract that handles token distribution for educational achievements",
-    reward: 0.5,
-    estimatedTime: "2-3 hours",
-    difficulty: "Medium",
-  },
-  {
-    id: 2,
-    title: "Design a User Dashboard UI",
-    description:
-      "Create a responsive UI design for the student dashboard showing achievements and rewards",
-    reward: 0.3,
-    estimatedTime: "1-2 hours",
-    difficulty: "Easy",
-  },
-  {
-    id: 3,
-    title: "Implement Authentication System",
-    description:
-      "Build a secure authentication system that works with both traditional login and wallet connection",
-    reward: 0.8,
-    estimatedTime: "4-5 hours",
-    difficulty: "Hard",
-  },
-  {
-    id: 4,
-    title: "Create API for Course Data",
-    description:
-      "Develop a REST API that serves educational course data from the blockchain",
-    reward: 0.4,
-    estimatedTime: "2-3 hours",
-    difficulty: "Medium",
-  },
-  {
-    id: 5,
-    title: "Build Certificate Verification System",
-    description:
-      "Create a system to verify educational certificates using blockchain technology",
-    reward: 0.7,
-    estimatedTime: "3-4 hours",
-    difficulty: "Hard",
-  },
-  {
-    id: 6,
-    title: "Optimize Gas Costs for Smart Contracts",
-    description:
-      "Review and optimize existing smart contracts to reduce gas costs",
-    reward: 0.6,
-    estimatedTime: "2-3 hours",
-    difficulty: "Medium",
-  },
-];
+export interface Task {
+  id: number;
+  title: string;
+  description: string;
+  reward: string;
+  creator: string;
+  completer: string;
+  isCompleted: boolean;
+}
 
 // Task card component
 const TaskCard: React.FC<{
-  task: {
-    id: number;
-    title: string;
-    description: string;
-    reward: number;
-    estimatedTime: string;
-    difficulty: string;
-  };
+  task: Task;
   onStartTask: (taskId: number) => void;
-}> = ({ task, onStartTask }) => {
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty.toLowerCase()) {
-      case "easy":
-        return "bg-green-100 text-green-800";
-      case "medium":
-        return "bg-yellow-100 text-yellow-800";
-      case "hard":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
+  currentAccount: string | null;
+}> = ({ task, onStartTask, currentAccount }) => {
+  const isCreator = currentAccount?.toLowerCase() === task.creator.toLowerCase();
+  const isCompleted = task.isCompleted;
+  
   return (
     <Card className="p-6 h-full flex flex-col justify-between hover:shadow-lg transition-shadow duration-300">
       <div>
         <div className="flex justify-between items-start mb-2">
           <h3 className="text-xl font-bold">{task.title}</h3>
-          <Badge className={getDifficultyColor(task.difficulty)}>
-            {task.difficulty}
+          <Badge className={isCompleted ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800"}>
+            {isCompleted ? "Completed" : "Active"}
           </Badge>
         </div>
         <p className="text-gray-600 mb-4">{task.description}</p>
         <div className="flex items-center gap-4 mb-2">
           <div className="flex items-center">
             <Award className="h-5 w-5 text-yellow-500 mr-2" />
-            <span className="font-medium">{task.reward} ETH</span>
+            <span className="font-medium">{task.reward} EDU</span>
           </div>
           <div className="flex items-center">
-            <Clock className="h-5 w-5 text-blue-500 mr-2" />
-            <span>{task.estimatedTime}</span>
+            <Wallet className="h-5 w-5 text-blue-500 mr-2" />
+            <span className="text-xs text-gray-500">
+              {task.creator.slice(0, 6)}...{task.creator.slice(-4)}
+            </span>
           </div>
         </div>
       </div>
       <Button
         className="w-full mt-4 flex items-center justify-center"
         onClick={() => onStartTask(task.id)}
+        disabled={isCompleted || isCreator}
+        variant={isCompleted || isCreator ? "outline" : "default"}
       >
-        Start Task
-        <ArrowRight className="ml-2 h-4 w-4" />
+        {isCompleted 
+          ? "Completed" 
+          : isCreator 
+            ? "You created this task" 
+            : "Complete Task"}
+        {!isCompleted && !isCreator && <ArrowRight className="ml-2 h-4 w-4" />}
       </Button>
     </Card>
   );
 };
 
 const Dashboard = () => {
-  const [account, setAccount] = useState<string | null>(null);
-  const [tasks, setTasks] = useState(sampleTasks);
+  const { account, isCorrectNetwork, switchNetwork, eduTokenBalance, refreshBalance } = useWeb3();
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const navigate = useNavigate();
 
   // Check if user is connected before showing dashboard
   useEffect(() => {
-    const storedAccount = localStorage.getItem("connectedAccount");
-    if (!storedAccount) {
+    if (!account) {
       navigate("/dapp");
-    } else {
-      setAccount(storedAccount);
     }
-  }, [navigate]);
+  }, [account, navigate]);
 
-  const handleStartTask = (taskId: number) => {
-    console.log(`Starting task ${taskId}`);
-    // Here you would navigate to the task details page or start the task
-    // For demo purposes, we'll just log it
-    alert(
-      `You've started task #${taskId}. In a real app, you would be redirected to the task page.`
-    );
+  // Refresh the balance when component mounts
+  useEffect(() => {
+    const loadBalance = async () => {
+      if (!account || !isCorrectNetwork) return;
+      
+      try {
+        setIsLoadingBalance(true);
+        await refreshBalance();
+      } catch (error) {
+        console.error("Error refreshing token balance:", error);
+      } finally {
+        setIsLoadingBalance(false);
+      }
+    };
+
+    loadBalance();
+  }, [account, isCorrectNetwork, refreshBalance]);
+
+  // Fetch tasks from the blockchain
+  useEffect(() => {
+    const fetchTasks = async () => {
+      if (!account) return;
+      
+      if (!isCorrectNetwork) {
+        toast({
+          title: "Wrong network",
+          description: "Please switch to the Open Campus Codex network to view tasks",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      try {
+        setLoading(true);
+        const fetchedTasks = await taskService.getAllTasks();
+        setTasks(fetchedTasks);
+      } catch (error) {
+        console.error("Error fetching tasks:", error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch tasks. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTasks();
+  }, [account, isCorrectNetwork]);
+
+  const handleCompleteTask = async (taskId: number) => {
+    if (!account) {
+      toast({
+        title: "Wallet not connected",
+        description: "Please connect your wallet to complete a task",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!isCorrectNetwork) {
+      toast({
+        title: "Wrong network",
+        description: "Please switch to the Open Campus Codex network",
+        variant: "destructive",
+      });
+      await switchNetwork();
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      await taskService.completeTask(taskId);
+      
+      // Refresh the tasks list
+      const updatedTasks = await taskService.getAllTasks();
+      setTasks(updatedTasks);
+      
+      // Refresh balance after task completion
+      await refreshBalance();
+      
+      toast({
+        title: "Task completed",
+        description: "You have successfully completed the task and earned EDU tokens!",
+      });
+    } catch (error: any) {
+      console.error(`Error completing task ${taskId}:`, error);
+      
+      let errorMessage = "Failed to complete task. Please try again.";
+      
+      // Check for specific error messages
+      if (error.message?.includes("user rejected")) {
+        errorMessage = "Transaction was rejected by the user.";
+      } else if (error.message?.includes("insufficient funds")) {
+        errorMessage = "Insufficient funds for gas * price + value.";
+      }
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const disconnectWallet = () => {
-    localStorage.removeItem("connectedAccount");
-    setAccount(null);
-    navigate("/dapp");
+  const handleRefresh = async () => {
+    setLoading(true);
+    try {
+      // Reset the TaskService provider to ensure fresh connection
+      await taskService.resetProvider();
+      
+      // Refresh balance
+      await refreshBalance();
+      
+      // Fetch tasks again
+      const fetchedTasks = await taskService.getAllTasks();
+      setTasks(fetchedTasks);
+      
+      toast({
+        title: "Refreshed",
+        description: "Task list and balance updated successfully",
+      });
+    } catch (error) {
+      console.error("Error refreshing data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to refresh data. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -163,15 +232,24 @@ const Dashboard = () => {
             </a>
 
             {account && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2"
-                onClick={disconnectWallet}
-              >
-                <Wallet size={16} />
-                {account.slice(0, 6)}...{account.slice(-4)}
-              </Button>
+              <div className="flex items-center gap-4">
+                <div className="hidden md:flex items-center gap-2 text-sm">
+                  <Award className="h-4 w-4 text-yellow-500" />
+                  {isLoadingBalance ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <span>{eduTokenBalance || "0"} EDU</span>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <Wallet size={16} />
+                  {account.slice(0, 6)}...{account.slice(-4)}
+                </Button>
+              </div>
             )}
           </div>
         </div>
@@ -182,15 +260,99 @@ const Dashboard = () => {
           <h1 className="text-3xl font-bold mb-2">Task Dashboard</h1>
           <p className="text-gray-600">
             Welcome to EduBounty! Here are available tasks you can work on to
-            earn rewards.
+            earn EDU token rewards.
           </p>
+          <div className="flex gap-4 mt-4">
+            <Button
+              onClick={() => navigate("/create-task")}
+              className="flex items-center gap-2"
+            >
+              <Plus size={16} />
+              Create Task
+            </Button>
+            <Button
+              onClick={handleRefresh}
+              variant="outline"
+              className="flex items-center gap-2"
+              disabled={loading}
+            >
+              {loading ? (
+                <Loader2 size={16} className="animate-spin mr-2" />
+              ) : (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="mr-2"
+                >
+                  <path d="M21 2v6h-6"></path>
+                  <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
+                  <path d="M3 22v-6h6"></path>
+                  <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+                </svg>
+              )}
+              Refresh
+            </Button>
+            {!isCorrectNetwork && (
+              <Button
+                onClick={switchNetwork}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <Wallet size={16} />
+                Switch to Open Campus Codex
+              </Button>
+            )}
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {tasks.map((task) => (
-            <TaskCard key={task.id} task={task} onStartTask={handleStartTask} />
-          ))}
-        </div>
+        {!isCorrectNetwork && (
+          <Alert className="mb-6 bg-yellow-50">
+            <AlertTitle>Wrong Network</AlertTitle>
+            <AlertDescription className="flex flex-col gap-2">
+              <p>You are not connected to the Open Campus Codex network.</p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-fit"
+                onClick={switchNetwork}
+              >
+                Switch Network
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+            <span className="ml-2 text-lg">Loading tasks...</span>
+          </div>
+        ) : tasks.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500 mb-4">No tasks available yet.</p>
+            <Button onClick={() => navigate("/create-task")}>
+              Create the first task
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {tasks.map((task) => (
+              <TaskCard 
+                key={task.id} 
+                task={task} 
+                onStartTask={handleCompleteTask}
+                currentAccount={account} 
+              />
+            ))}
+          </div>
+        )}
       </main>
     </div>
   );

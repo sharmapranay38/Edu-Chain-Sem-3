@@ -86,11 +86,19 @@ const TaskCard: React.FC<{
 };
 
 const Dashboard = () => {
-  const { account, isCorrectNetwork, switchNetwork, eduTokenBalance, refreshBalance, disconnectWallet } = useWeb3();
+  const web3Context = useWeb3();
+  const { account, isCorrectNetwork, switchNetwork, eduBalance, refreshBalance, disconnectWallet } = web3Context;
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const navigate = useNavigate();
+
+  // Set web3Context in TaskService
+  useEffect(() => {
+    if (web3Context) {
+      taskService.setWeb3Context(web3Context);
+    }
+  }, [web3Context]);
 
   // Check if user is connected before showing dashboard
   useEffect(() => {
@@ -211,7 +219,7 @@ const Dashboard = () => {
     setLoading(true);
     try {
       // Reset the TaskService provider to ensure fresh connection
-      await taskService.resetProvider(true);
+      await taskService.resetProvider();
       
       // Refresh balance
       await refreshBalance();
@@ -259,7 +267,7 @@ const Dashboard = () => {
                   {isLoadingBalance ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <span>{eduTokenBalance || "0"} EDU</span>
+                    <span>{eduBalance || "0"} EDU</span>
                   )}
                 </div>
                 
@@ -279,7 +287,7 @@ const Dashboard = () => {
                     <DropdownMenuLabel>Wallet</DropdownMenuLabel>
                     <DropdownMenuItem className="flex items-center gap-2">
                       <Award size={14} className="text-yellow-500" />
-                      <span>{eduTokenBalance || "0"} EDU</span>
+                      <span>{eduBalance || "0"} EDU</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem 

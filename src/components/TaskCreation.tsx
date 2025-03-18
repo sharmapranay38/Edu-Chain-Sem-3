@@ -18,7 +18,8 @@ interface FormData {
 }
 
 const TaskCreation: React.FC = () => {
-  const { account, isCorrectNetwork, switchNetwork, eduTokenBalance, refreshBalance } = useWeb3();
+  const web3Context = useWeb3();
+  const { account, isCorrectNetwork, switchNetwork, eduBalance, refreshBalance } = web3Context;
   const [formData, setFormData] = useState<FormData>({
     title: "",
     description: "",
@@ -27,6 +28,13 @@ const TaskCreation: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const navigate = useNavigate();
+
+  // Set web3Context in TaskService
+  useEffect(() => {
+    if (web3Context) {
+      taskService.setWeb3Context(web3Context);
+    }
+  }, [web3Context]);
 
   // Redirect to DApp page if not connected
   useEffect(() => {
@@ -90,10 +98,10 @@ const TaskCreation: React.FC = () => {
     }
 
     // Check if user has enough balance
-    if (eduTokenBalance && parseFloat(eduTokenBalance) < reward) {
+    if (eduBalance && parseFloat(eduBalance) < reward) {
       toast({
         title: "Insufficient balance",
-        description: `You need at least ${reward} EDU tokens to create this task. Your balance: ${eduTokenBalance} EDU`,
+        description: `You need at least ${reward} EDU tokens to create this task. Your balance: ${eduBalance} EDU`,
         variant: "destructive",
       });
       return false;
@@ -193,7 +201,7 @@ const TaskCreation: React.FC = () => {
                   {isLoadingBalance ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <span>{eduTokenBalance || "0"} EDU</span>
+                    <span>{eduBalance || "0"} EDU</span>
                   )}
                 </div>
                 <Button
@@ -265,9 +273,9 @@ const TaskCreation: React.FC = () => {
             <div className="space-y-2">
               <Label htmlFor="reward">
                 Reward (EDU Tokens)
-                {eduTokenBalance && (
+                {eduBalance && (
                   <span className="text-sm text-gray-500 ml-2">
-                    Your balance: {eduTokenBalance} EDU
+                    Your balance: {eduBalance} EDU
                   </span>
                 )}
               </Label>

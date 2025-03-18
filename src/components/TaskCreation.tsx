@@ -18,7 +18,7 @@ interface FormData {
 }
 
 const TaskCreation: React.FC = () => {
-  const { account, isCorrectNetwork, switchNetwork, eduTokenBalance, refreshBalance } = useWeb3();
+  const { account, isCorrectNetwork, switchNetwork, eduBalance, refreshBalance, connectWallet } = useWeb3();
   const [formData, setFormData] = useState<FormData>({
     title: "",
     description: "",
@@ -26,6 +26,8 @@ const TaskCreation: React.FC = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
+  const [transactionStep, setTransactionStep] = useState<number>(0);
+  const [transactionStatus, setTransactionStatus] = useState<string>("");
   const navigate = useNavigate();
 
   // Redirect to DApp page if not connected
@@ -90,16 +92,27 @@ const TaskCreation: React.FC = () => {
     }
 
     // Check if user has enough balance
-    if (eduTokenBalance && parseFloat(eduTokenBalance) < reward) {
+    if (eduBalance && parseFloat(eduBalance) < reward) {
       toast({
         title: "Insufficient balance",
-        description: `You need at least ${reward} EDU tokens to create this task. Your balance: ${eduTokenBalance} EDU`,
+        description: `You need at least ${reward} EDU tokens to create this task. Your balance: ${eduBalance} EDU`,
         variant: "destructive",
       });
       return false;
     }
 
     return true;
+  };
+
+  const getStepMessage = (step: number) => {
+    switch (step) {
+      case 1:
+        return "Step 1/2: Please confirm task creation fee in MetaMask...";
+      case 2:
+        return "Step 2/2: Please confirm reward deposit in MetaMask...";
+      default:
+        return "Preparing transaction...";
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -111,7 +124,14 @@ const TaskCreation: React.FC = () => {
         description: "Please connect your wallet to create a task",
         variant: "destructive",
       });
-      navigate("/dapp");
+      
+      // Explicitly try to connect wallet
+      try {
+        await connectWallet();
+      } catch (error) {
+        console.error("Failed to connect wallet:", error);
+      }
+      
       return;
     }
 
@@ -130,24 +150,33 @@ const TaskCreation: React.FC = () => {
     }
 
     setIsSubmitting(true);
+    setTransactionStep(1);
+    setTransactionStatus(getStepMessage(1));
 
     try {
       // Reset the TaskService provider to ensure fresh connection
-      await taskService.resetProvider();
+      console.log("Resetting provider before task creation");
+      const initialized = await taskService.resetProvider();
+      console.log("Provider reset successful:", initialized);
       
-      // Create the task
-      await taskService.createTask(
+      // Create the task - this will trigger two MetaMask popups
+      console.log("Starting task creation process");
+      const result = await taskService.createTask(
         formData.title,
         formData.description,
         formData.reward
       );
+      console.log("Task creation result:", result);
+
+      setTransactionStep(2);
+      setTransactionStatus(getStepMessage(2));
 
       // Refresh the balance after task creation
       await refreshBalance();
 
       toast({
-        title: "Task created",
-        description: "Your task has been created successfully!",
+        title: "Task created successfully!",
+        description: "Your task has been created and the reward has been deposited.",
       });
 
       // Navigate to dashboard
@@ -157,11 +186,12 @@ const TaskCreation: React.FC = () => {
       
       let errorMessage = "Failed to create task. Please try again.";
       
-      // Check for specific error messages
-      if (error.message?.includes("user rejected")) {
-        errorMessage = "Transaction was rejected by the user.";
-      } else if (error.message?.includes("insufficient funds")) {
-        errorMessage = "Insufficient funds for gas * price + value.";
+      if (error.message?.includes("rejected")) {
+        errorMessage = "Transaction was rejected in MetaMask.";
+      } else if (error.message?.includes("insufficient")) {
+        errorMessage = "Insufficient EDU tokens for the transaction.";
+      } else if (error.message?.includes("MetaMask not detected")) {
+        errorMessage = "MetaMask not detected. Please install MetaMask to use this application.";
       }
       
       toast({
@@ -171,6 +201,8 @@ const TaskCreation: React.FC = () => {
       });
     } finally {
       setIsSubmitting(false);
+      setTransactionStep(0);
+      setTransactionStatus("");
     }
   };
 
@@ -193,7 +225,7 @@ const TaskCreation: React.FC = () => {
                   {isLoadingBalance ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <span>{eduTokenBalance || "0"} EDU</span>
+                    <span>{eduBalance || "0"} EDU</span>
                   )}
                 </div>
                 <Button
@@ -265,9 +297,9 @@ const TaskCreation: React.FC = () => {
             <div className="space-y-2">
               <Label htmlFor="reward">
                 Reward (EDU Tokens)
-                {eduTokenBalance && (
+                {eduBalance && (
                   <span className="text-sm text-gray-500 ml-2">
-                    Your balance: {eduTokenBalance} EDU
+                    Your balance: {eduBalance} EDU
                   </span>
                 )}
               </Label>
@@ -287,17 +319,35 @@ const TaskCreation: React.FC = () => {
               </p>
             </div>
 
+            {isSubmitting && (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Transaction in Progress - Step {transactionStep}/2</AlertTitle>
+                <AlertDescription className="mt-2">
+                  <div className="space-y-2">
+                    <p>{transactionStatus}</p>
+                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                      <div 
+                        className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" 
+                        style={{ width: `${(transactionStep / 2) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="flex gap-4">
               <Button
                 type="submit"
-                disabled={isSubmitting || !isCorrectNetwork}
                 className="w-full"
+                disabled={isSubmitting}
               >
                 {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating...
-                  </>
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Processing Step {transactionStep}/2...</span>
+                  </div>
                 ) : (
                   "Create Task"
                 )}

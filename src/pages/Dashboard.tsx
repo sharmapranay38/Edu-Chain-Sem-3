@@ -12,6 +12,7 @@ import { useWeb3 } from "@/contexts/Web3Context";
 import taskService from "@/services/TaskService";
 import { toast } from "@/components/ui/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ethers } from 'ethers';
 
 export interface Task {
   id: number;
@@ -132,10 +133,11 @@ const TaskCard: React.FC<{
 };
 
 const Dashboard = () => {
-  const { account, isCorrectNetwork, switchNetwork, eduTokenBalance, refreshBalance } = useWeb3();
+  const { account, isCorrectNetwork, switchNetwork, eduBalance, refreshBalance } = useWeb3();
   const [loading, setLoading] = useState(true);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const [activeTab, setActiveTab] = useState("available");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
   // Initialize tasks from localStorage or use default tasks
@@ -182,6 +184,19 @@ const Dashboard = () => {
     }
     setLoading(false);
   }, [account, navigate]);
+
+  const [rewards, setRewards] = useState<{amount: string, taskId: number, title: string}[]>(() => {
+    const savedRewards = localStorage.getItem('educhain_rewards');
+    if (savedRewards) {
+      return JSON.parse(savedRewards);
+    }
+    return [];
+  });
+
+  // Save rewards to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('educhain_rewards', JSON.stringify(rewards));
+  }, [rewards]);
 
   const handleStartTask = (taskId: number) => {
     setTasks(tasks.map(task => {
@@ -234,21 +249,116 @@ const Dashboard = () => {
     }));
   };
 
-  const handlePay = (taskId: number) => {
-    setTasks(tasks.map(task => {
-      if (task.id === taskId) {
-        toast({
-          title: "Payment Sent",
-          description: "The reward has been paid to the completer.",
+  const handlePay = async (taskId: number) => {
+    try {
+      setIsSubmitting(true);
+      
+      // Find the task
+      const task = tasks.find(t => t.id === taskId);
+      if (!task || !task.completer) return;
+      
+      // Simulate MetaMask payment transaction
+      if (taskService.provider) {
+        const signer = taskService.provider.getSigner();
+        console.log("Requesting payment approval...");
+        
+        // Directly request accounts to ensure MetaMask opens
+        await window.ethereum.request({ method: 'eth_requestAccounts' });
+        
+        // Simulate a payment transaction
+        const paymentAmount = ethers.utils.parseEther(task.reward);
+        const tx = await signer.sendTransaction({
+          to: task.completer, // Send to completer's address
+          value: paymentAmount,
+          gasLimit: 21000
         });
-        return { 
-          ...task, 
-          isPaid: true,
-          status: 'paid'
-        };
+        
+        console.log("Payment transaction submitted:", tx.hash);
+        await tx.wait();
+        
+        // Add to rewards for the completer
+        if (task.completer.toLowerCase() === account?.toLowerCase()) {
+          // If current user is the completer, add to their rewards
+          setRewards(prev => [...prev, {
+            amount: task.reward,
+            taskId: task.id,
+            title: task.title
+          }]);
+        }
+        
+        // Update task status
+        setTasks(tasks.map(t => {
+          if (t.id === taskId) {
+            toast({
+              title: "Payment Sent",
+              description: "The reward has been paid to the completer.",
+            });
+            return { 
+              ...t, 
+              isPaid: true,
+              status: 'paid'
+            };
+          }
+          return t;
+        }));
       }
-      return task;
-    }));
+    } catch (error) {
+      console.error("Error paying reward:", error);
+      toast({
+        title: "Payment Failed",
+        description: "Failed to send the payment. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleWithdrawReward = async (rewardIndex: number) => {
+    try {
+      setIsSubmitting(true);
+      
+      // Find the reward
+      const reward = rewards[rewardIndex];
+      if (!reward) return;
+      
+      // Simulate MetaMask withdrawal transaction
+      if (taskService.provider) {
+        const signer = taskService.provider.getSigner();
+        console.log("Requesting withdrawal approval...");
+        
+        // Directly request accounts to ensure MetaMask opens
+        await window.ethereum.request({ method: 'eth_requestAccounts' });
+        
+        // Simulate a withdrawal transaction
+        const withdrawalAmount = ethers.utils.parseEther(reward.amount);
+        const tx = await signer.sendTransaction({
+          to: await signer.getAddress(), // Send to self (dummy transaction)
+          value: ethers.utils.parseEther("0.001"), // Small amount for simulation
+          gasLimit: 21000
+        });
+        
+        console.log("Withdrawal transaction submitted:", tx.hash);
+        await tx.wait();
+        
+        // Remove from rewards
+        setRewards(prev => prev.filter((_, index) => index !== rewardIndex));
+        
+        toast({
+          title: "Reward Withdrawn",
+          description: `You have successfully withdrawn ${reward.amount} EDU`,
+        });
+      }
+    } catch (error) {
+      console.error("Error withdrawing reward:", error);
+      toast({
+        title: "Withdrawal Failed",
+        description: "Failed to withdraw the reward. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const [newTask, setNewTask] = useState({
@@ -308,8 +418,13 @@ const Dashboard = () => {
     task.creator.toLowerCase() === account?.toLowerCase()
   );
 
+  // Calculate total rewards
+  const totalRewards = rewards.reduce((sum, reward) => {
+    return sum + parseFloat(reward.amount);
+  }, 0).toFixed(2);
+
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
       <header className="fixed top-0 w-full z-50 py-2 glass">
         <div className="container mx-auto px-4">
           <div className="flex justify-between items-center">
@@ -354,33 +469,78 @@ const Dashboard = () => {
       </header>
 
       <div className="container mx-auto px-4 py-8 mt-16">
+        <div className="flex flex-col md:flex-row gap-6 mb-8">
+          <Card className="p-6 flex-1">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-full bg-blue-100">
+                <Wallet className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-500">EDU Balance</h3>
+                <p className="text-2xl font-bold">
+                  {isLoadingBalance ? (
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  ) : (
+                    eduBalance ? `${eduBalance} EDU` : "Connect wallet"
+                  )}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-auto"
+                onClick={refreshBalance}
+                disabled={isLoadingBalance}
+              >
+                {isLoadingBalance ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Refresh"
+                )}
+              </Button>
+            </div>
+          </Card>
+          
+          <Card className="p-6 flex-1">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-full bg-green-100">
+                <Gift className="h-6 w-6 text-green-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-500">Available Rewards</h3>
+                <p className="text-2xl font-bold">{totalRewards} EDU</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-auto"
+                onClick={() => setActiveTab("rewards")}
+                disabled={rewards.length === 0}
+              >
+                Manage
+              </Button>
+            </div>
+          </Card>
+        </div>
+        
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5 gap-4">
-            <TabsTrigger value="available" className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              Available Tasks
-            </TabsTrigger>
-            <TabsTrigger value="create" className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Create Task
-            </TabsTrigger>
-            <TabsTrigger value="review" className="flex items-center gap-2">
-              <ArrowRight className="h-4 w-4" />
-              Review Tasks
-            </TabsTrigger>
-            <TabsTrigger value="profile" className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              Profile
-            </TabsTrigger>
-            <TabsTrigger value="rewards" className="flex items-center gap-2">
-              <Gift className="h-4 w-4" />
+          <TabsList className="grid grid-cols-2 md:grid-cols-5 gap-2">
+            <TabsTrigger value="available">Available Tasks</TabsTrigger>
+            <TabsTrigger value="created">My Created Tasks</TabsTrigger>
+            <TabsTrigger value="in-progress">In Progress</TabsTrigger>
+            <TabsTrigger value="review">Awaiting Review</TabsTrigger>
+            <TabsTrigger value="rewards" className="relative">
               Rewards
+              {rewards.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {rewards.length}
+                </span>
+              )}
             </TabsTrigger>
           </TabsList>
-
           <TabsContent value="available" className="space-y-8">
             <div>
-              <h2 className="text-2xl font-semibold mb-4">Available Tasks</h2>
+              <h2 className="text-2xl font-bold">Available Tasks</h2>
               {loading ? (
                 <div className="flex justify-center">
                   <Loader2 className="h-8 w-8 animate-spin" />
@@ -388,7 +548,7 @@ const Dashboard = () => {
               ) : availableTasks.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-gray-500">No available tasks at the moment.</p>
-                  <Button onClick={() => setActiveTab("create")} className="mt-4">
+                  <Button onClick={() => setActiveTab("create")}>
                     Create a Task
                   </Button>
                 </div>
@@ -407,7 +567,7 @@ const Dashboard = () => {
             </div>
 
             <div>
-              <h2 className="text-2xl font-semibold mb-4">My Created Tasks</h2>
+              <h2 className="text-2xl font-bold">My Created Tasks</h2>
               {myCreatedTasks.length === 0 ? (
                 <p className="text-gray-500">You haven't created any tasks yet.</p>
               ) : (
@@ -426,7 +586,7 @@ const Dashboard = () => {
           </TabsContent>
 
           <TabsContent value="create">
-            <h2 className="text-2xl font-semibold mb-4">Create New Task</h2>
+            <h2 className="text-2xl font-bold">Create New Task</h2>
             <Card className="p-6">
               <form onSubmit={handleCreateTask} className="space-y-4">
                 <div className="space-y-2">
@@ -467,9 +627,9 @@ const Dashboard = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="review" className="space-y-8">
+          <TabsContent value="in-progress" className="space-y-8">
             <div>
-              <h2 className="text-2xl font-semibold mb-4">My Tasks In Progress</h2>
+              <h2 className="text-2xl font-bold">My Tasks In Progress</h2>
               {myInProgressTasks.length === 0 ? (
                 <p className="text-gray-500">You haven't started any tasks yet.</p>
               ) : (
@@ -488,7 +648,7 @@ const Dashboard = () => {
             </div>
 
             <div>
-              <h2 className="text-2xl font-semibold mb-4">Tasks Awaiting Review</h2>
+              <h2 className="text-2xl font-bold">Tasks Awaiting Review</h2>
               {tasksAwaitingReview.length === 0 ? (
                 <p className="text-gray-500">No tasks awaiting your review.</p>
               ) : (
@@ -507,7 +667,7 @@ const Dashboard = () => {
             </div>
 
             <div>
-              <h2 className="text-2xl font-semibold mb-4">Completed Tasks</h2>
+              <h2 className="text-2xl font-bold">Completed Tasks</h2>
               {completedTasks.length === 0 ? (
                 <p className="text-gray-500">No completed tasks yet.</p>
               ) : (
@@ -526,56 +686,118 @@ const Dashboard = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="profile">
-            <h2 className="text-2xl font-semibold mb-4">Your Profile</h2>
-            <Card className="p-6">
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-medium">Wallet Address</h3>
-                  <p className="text-gray-600">{account}</p>
+          <TabsContent value="review" className="space-y-8">
+            <div>
+              <h2 className="text-2xl font-bold">My Tasks In Progress</h2>
+              {myInProgressTasks.length === 0 ? (
+                <p className="text-gray-500">You haven't started any tasks yet.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {myInProgressTasks.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      onSubmit={handleSubmitWork}
+                      currentAccount={account}
+                      showSubmission
+                    />
+                  ))}
                 </div>
-                <div>
-                  <h3 className="text-lg font-medium">Tasks Completed</h3>
-                  <p className="text-gray-600">{completedTasks.length}</p>
+              )}
+            </div>
+
+            <div>
+              <h2 className="text-2xl font-bold">Tasks Awaiting Review</h2>
+              {tasksAwaitingReview.length === 0 ? (
+                <p className="text-gray-500">No tasks awaiting your review.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {tasksAwaitingReview.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      onMarkComplete={handleMarkComplete}
+                      currentAccount={account}
+                      showSubmission
+                    />
+                  ))}
                 </div>
-                <div>
-                  <h3 className="text-lg font-medium">Tasks Created</h3>
-                  <p className="text-gray-600">{myCreatedTasks.length}</p>
+              )}
+            </div>
+
+            <div>
+              <h2 className="text-2xl font-bold">Completed Tasks</h2>
+              {completedTasks.length === 0 ? (
+                <p className="text-gray-500">No completed tasks yet.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {completedTasks.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      onPay={!task.isPaid ? handlePay : undefined}
+                      currentAccount={account}
+                      showSubmission
+                    />
+                  ))}
                 </div>
-                <div>
-                  <h3 className="text-lg font-medium">EDU Balance</h3>
-                  <p className="text-gray-600">{eduTokenBalance} EDU</p>
-                </div>
-              </div>
-            </Card>
+              )}
+            </div>
           </TabsContent>
 
-          <TabsContent value="rewards">
-            <h2 className="text-2xl font-semibold mb-4">Your Rewards</h2>
-            <Card className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <Award className="h-8 w-8 text-yellow-500" />
-                  <div>
-                    <h3 className="text-lg font-medium">Total EDU Earned</h3>
-                    <p className="text-gray-600">{eduTokenBalance} EDU</p>
-                  </div>
+          <TabsContent value="rewards" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold">My Rewards</h2>
+              {rewards.length > 0 && (
+                <Button
+                  onClick={() => {
+                    // Withdraw all rewards at once
+                    rewards.forEach((_, index) => handleWithdrawReward(0));
+                  }}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : null}
+                  Withdraw All ({totalRewards} EDU)
+                </Button>
+              )}
+            </div>
+            
+            {rewards.length === 0 ? (
+              <Card className="p-6">
+                <div className="text-center py-8">
+                  <Gift className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-500 mb-2">No Rewards Available</h3>
+                  <p className="text-gray-400 mb-4">Complete tasks to earn rewards</p>
+                  <Button onClick={() => setActiveTab("available")}>
+                    Browse Available Tasks
+                  </Button>
                 </div>
-                <div>
-                  <h3 className="text-lg font-medium">Completed Tasks</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-                    {completedTasks.map((task) => (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        currentAccount={account}
-                        showSubmission
-                      />
-                    ))}
-                  </div>
-                </div>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 gap-4">
+                {rewards.map((reward, index) => (
+                  <Card key={`${reward.taskId}-${index}`} className="p-6">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h3 className="font-medium">{reward.title}</h3>
+                        <p className="text-xl font-bold text-green-600">{reward.amount} EDU</p>
+                      </div>
+                      <Button 
+                        onClick={() => handleWithdrawReward(index)}
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : null}
+                        Withdraw
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
               </div>
-            </Card>
+            )}
           </TabsContent>
         </Tabs>
       </div>

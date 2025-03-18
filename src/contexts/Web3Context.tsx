@@ -1,31 +1,20 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  ReactNode,
-} from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import { ethers } from "ethers";
-import {
-  CONTRACT_ADDRESS,
-  TASK_MANAGER_ABI,
-  EDU_TOKEN_ADDRESS,
-  ERC20_ABI,
-} from "../contracts/ContractConfig";
+import { CONTRACT_ADDRESS, TASK_MANAGER_ABI } from "@/contracts/ContractConfig";
 
 interface Web3ContextType {
   account: string | null;
   provider: ethers.providers.Web3Provider | null;
   taskManager: ethers.Contract | null;
-  eduToken: ethers.Contract | null;
   connectWallet: () => Promise<void>;
   disconnectWallet: () => void;
   isConnecting: boolean;
   chainId: number | null;
   isCorrectNetwork: boolean;
   switchNetwork: () => Promise<void>;
-  eduTokenBalance: string | null;
+  eduBalance: string | null;
   refreshBalance: () => Promise<void>;
+  checkSufficientBalance: (amount: string) => Promise<boolean>;
 }
 
 const Web3Context = createContext<Web3ContextType | null>(null);
@@ -38,21 +27,17 @@ export const useWeb3 = () => {
   return context;
 };
 
-interface Web3ProviderProps {
-  children: ReactNode;
-}
-
-export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
+export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [account, setAccount] = useState<string | null>(null);
   const [provider, setProvider] =
     useState<ethers.providers.Web3Provider | null>(null);
   const [taskManager, setTaskManager] = useState<ethers.Contract | null>(null);
-  const [eduToken, setEduToken] = useState<ethers.Contract | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [chainId, setChainId] = useState<number | null>(null);
-  const [eduTokenBalance, setEduTokenBalance] = useState<string | null>(null);
+  const [eduBalance, setEduBalance] = useState<string | null>(null);
 
-  // Open Campus Codex testnet details
   const targetChainId = 656476; // Open Campus Codex testnet
   const isCorrectNetwork = chainId === targetChainId;
 
@@ -60,7 +45,6 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
   const initializeProvider = async () => {
     if (window.ethereum) {
       try {
-        // Create a Web3Provider with Open Campus Codex network config
         const web3Provider = new ethers.providers.Web3Provider(
           window.ethereum,
           {
@@ -71,36 +55,22 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
 
         setProvider(web3Provider);
 
-        // Get the network
+        // Get network information
         const network = await web3Provider.getNetwork();
         setChainId(network.chainId);
 
-        // Initialize contracts
+        // Initialize contract
         const signer = web3Provider.getSigner();
         const taskManagerContract = new ethers.Contract(
           CONTRACT_ADDRESS,
           TASK_MANAGER_ABI,
           signer
         );
-        const eduTokenContract = new ethers.Contract(
-          EDU_TOKEN_ADDRESS,
-          ERC20_ABI,
-          signer
-        );
 
         setTaskManager(taskManagerContract);
-        setEduToken(eduTokenContract);
-
-        // Check if already connected
-        const accounts = await web3Provider.listAccounts();
-        if (accounts.length > 0) {
-          setAccount(accounts[0]);
-        }
       } catch (error) {
         console.error("Failed to initialize provider:", error);
       }
-    } else {
-      console.error("Ethereum provider not detected");
     }
   };
 
@@ -120,10 +90,16 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
       });
       setAccount(accounts[0]);
 
-      // Ensure provider is initialized
+      // Initialize provider if not already done
       if (!provider) {
         await initializeProvider();
       }
+
+      // Store the connected account
+      localStorage.setItem("connectedAccount", accounts[0]);
+
+      // Refresh balance
+      await refreshBalance();
     } catch (error) {
       console.error("Failed to connect wallet:", error);
     } finally {
@@ -134,7 +110,9 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
   // Disconnect wallet
   const disconnectWallet = () => {
     setAccount(null);
-    setEduTokenBalance(null);
+    setEduBalance(null);
+    localStorage.removeItem("connectedAccount");
+    window.location.href = "/";
   };
 
   // Switch network
@@ -144,80 +122,80 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
     try {
       await window.ethereum.request({
         method: "wallet_switchEthereumChain",
-        params: [{ chainId: ethers.utils.hexValue(targetChainId) }],
+        params: [{ chainId: `0x${targetChainId.toString(16)}` }],
       });
     } catch (error: any) {
-      // This error code indicates that the chain has not been added to MetaMask
       if (error.code === 4902) {
         try {
-          // Add the Open Campus Codex network
           await window.ethereum.request({
             method: "wallet_addEthereumChain",
             params: [
               {
-                chainId: ethers.utils.hexValue(targetChainId),
+                chainId: `0x${targetChainId.toString(16)}`,
                 chainName: "Open Campus Codex",
                 nativeCurrency: {
-                  name: "Ether",
-                  symbol: "ETH",
+                  name: "EDU",
+                  symbol: "EDU",
                   decimals: 18,
                 },
                 rpcUrls: ["https://rpc.open-campus-codex.gelato.digital"],
-                blockExplorerUrls: ["https://opencampus-codex.blockscout.com/"],
               },
             ],
           });
         } catch (addError) {
           console.error("Failed to add network:", addError);
         }
-      } else {
-        console.error("Failed to switch network:", error);
       }
+      console.error("Failed to switch network:", error);
     }
   };
 
-  // Fetch EDU token balance
-  const fetchEduTokenBalance = async () => {
-    if (!account || !eduToken || !isCorrectNetwork) {
-      setEduTokenBalance(null);
-      return;
-    }
+  // Refresh EDU balance
+  const refreshBalance = async () => {
+    if (!provider || !account) return;
 
     try {
-      // Use a simpler approach to get the balance
-      const contract = eduToken.attach(EDU_TOKEN_ADDRESS);
-      const balance = await contract.balanceOf(account);
-      setEduTokenBalance(ethers.utils.formatEther(balance));
+      const balance = await provider.getBalance(account);
+      const formattedBalance = ethers.utils.formatEther(balance);
+      console.log("Current EDU balance:", formattedBalance);
+      setEduBalance(formattedBalance);
     } catch (error) {
-      console.error("Failed to fetch EDU token balance:", error);
-      setEduTokenBalance(null);
+      console.error("Error fetching EDU balance:", error);
+      setEduBalance(null);
     }
   };
 
-  // Public method to refresh balance
-  const refreshBalance = async () => {
-    await fetchEduTokenBalance();
+  // Check if user has sufficient EDU balance
+  const checkSufficientBalance = async (amount: string): Promise<boolean> => {
+    if (!provider || !account) return false;
+
+    try {
+      const balance = await provider.getBalance(account);
+      const requiredAmount = ethers.utils.parseEther(amount);
+      // Add 10% buffer for gas fees
+      const requiredWithGas = requiredAmount.mul(110).div(100);
+      return balance.gte(requiredWithGas);
+    } catch (error) {
+      console.error("Error checking balance:", error);
+      return false;
+    }
   };
 
-  // Listen for account changes
+  // Listen for account and network changes
   useEffect(() => {
     if (window.ethereum) {
       const handleAccountsChanged = (accounts: string[]) => {
         if (accounts.length === 0) {
-          // User disconnected their wallet
           disconnectWallet();
         } else {
-          // User switched accounts
           setAccount(accounts[0]);
+          localStorage.setItem("connectedAccount", accounts[0]);
         }
       };
 
       const handleChainChanged = (chainIdHex: string) => {
-        // Parse the hexadecimal chain ID
         const newChainId = parseInt(chainIdHex, 16);
         setChainId(newChainId);
-
-        // Reload the page to ensure all state is updated correctly
         window.location.reload();
       };
 
@@ -225,10 +203,16 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
       window.ethereum.on("accountsChanged", handleAccountsChanged);
       window.ethereum.on("chainChanged", handleChainChanged);
 
-      // Initialize on mount
+      // Initialize provider
       initializeProvider();
 
-      // Cleanup event listeners on unmount
+      // Check for stored account
+      const storedAccount = localStorage.getItem("connectedAccount");
+      if (storedAccount) {
+        setAccount(storedAccount);
+      }
+
+      // Cleanup
       return () => {
         window.ethereum.removeListener(
           "accountsChanged",
@@ -239,10 +223,10 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
     }
   }, []);
 
-  // Fetch token balance when account or network changes
+  // Update balance when account or network changes
   useEffect(() => {
-    fetchEduTokenBalance();
-  }, [account, chainId, eduToken]);
+    refreshBalance();
+  }, [account, chainId]);
 
   return (
     <Web3Context.Provider
@@ -250,15 +234,15 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
         account,
         provider,
         taskManager,
-        eduToken,
         connectWallet,
         disconnectWallet,
         isConnecting,
         chainId,
         isCorrectNetwork,
         switchNetwork,
-        eduTokenBalance,
+        eduBalance,
         refreshBalance,
+        checkSufficientBalance,
       }}
     >
       {children}

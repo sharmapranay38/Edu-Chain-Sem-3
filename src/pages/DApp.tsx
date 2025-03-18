@@ -2,38 +2,45 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Wallet } from "lucide-react";
+import { Wallet, AlertCircle, Loader2 } from "lucide-react";
+import { useWeb3 } from "@/contexts/Web3Context";
+import { toast } from "@/components/ui/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const DApp = () => {
-  const [account, setAccount] = useState<string | null>(null);
+  const { account, connectWallet, isConnecting, isCorrectNetwork, switchNetwork } = useWeb3();
+  const [connecting, setConnecting] = useState(false);
   const navigate = useNavigate();
 
   // Redirect to dashboard if wallet is connected
   useEffect(() => {
-    // Check if we have a stored account
-    const storedAccount = localStorage.getItem("connectedAccount");
-    if (storedAccount) {
-      setAccount(storedAccount);
+    if (account) {
       navigate("/dashboard");
     }
-  }, [navigate]);
+  }, [account, navigate]);
 
-  const connectWallet = async () => {
-    if (window.ethereum) {
-      try {
-        const accounts = await window.ethereum.request({
-          method: "eth_requestAccounts",
+  const handleConnectWallet = async () => {
+    setConnecting(true);
+    try {
+      await connectWallet();
+      
+      if (!isCorrectNetwork) {
+        toast({
+          title: "Wrong network",
+          description: "Please switch to the Open Campus Codex network",
+          variant: "destructive",
         });
-        setAccount(accounts[0]);
-        // Save the connected account to localStorage
-        localStorage.setItem("connectedAccount", accounts[0]);
-        // Redirect to dashboard
-        navigate("/dashboard");
-      } catch (error) {
-        console.error("Error connecting to MetaMask:", error);
+        await switchNetwork();
       }
-    } else {
-      alert("MetaMask not detected. Please install MetaMask to use this dApp.");
+    } catch (error) {
+      console.error("Error connecting wallet:", error);
+      toast({
+        title: "Connection failed",
+        description: "Failed to connect to your wallet. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setConnecting(false);
     }
   };
 
@@ -60,22 +67,52 @@ const DApp = () => {
             </h2>
             <p className="mb-8">
               Connect your wallet to access the task dashboard and start earning
-              rewards for educational contributions.
+              EDU tokens for educational contributions.
             </p>
+            
+            <Alert className="mb-6 bg-blue-50">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Network Information</AlertTitle>
+              <AlertDescription>
+                This dApp runs on the Open Campus Codex testnet (Chain ID: 656476).
+                Make sure your wallet is configured correctly.
+              </AlertDescription>
+            </Alert>
+            
             <div className="flex flex-col items-center">
               <Button
                 size="lg"
                 className="w-full flex items-center justify-center gap-2"
-                onClick={connectWallet}
+                onClick={handleConnectWallet}
+                disabled={connecting || isConnecting}
               >
-                <Wallet size={20} />
-                Connect Wallet
+                {(connecting || isConnecting) ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Connecting...
+                  </>
+                ) : (
+                  <>
+                    <Wallet size={20} />
+                    Connect Wallet
+                  </>
+                )}
               </Button>
 
               {account && (
                 <p className="text-sm text-gray-500 mt-4">
                   Wallet connected! Redirecting to dashboard...
                 </p>
+              )}
+              
+              {!isCorrectNetwork && account && (
+                <Button 
+                  variant="outline" 
+                  className="mt-4 w-full"
+                  onClick={switchNetwork}
+                >
+                  Switch to Open Campus Codex
+                </Button>
               )}
             </div>
           </Card>

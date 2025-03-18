@@ -34,29 +34,16 @@ const Header: React.FC<HeaderProps> = ({ setPubAddress }) => {
       // Check if MetaMask is installed
       if (window.ethereum) {
         try {
-          // Check if we have a stored account
+          // Check if we have a stored account but DO NOT request accounts
           const storedAccount = localStorage.getItem("connectedAccount");
 
           if (storedAccount) {
-            // Verify if the account is still connected to MetaMask
-            const accounts = await window.ethereum.request({
-              method: "eth_accounts",
-            });
-
-            if (accounts.length > 0) {
-              // If the stored account matches any of the current MetaMask accounts
-              if (accounts.includes(storedAccount)) {
-                setAccount(storedAccount);
-              } else {
-                // If the stored account is no longer available, update with the new primary account
-                setAccount(accounts[0]);
-                localStorage.setItem("connectedAccount", accounts[0]);
-              }
-            } else {
-              // No accounts available, clear storage
-              localStorage.removeItem("connectedAccount");
-              setAccount(null);
-            }
+            // We'll just set the stored account without verifying with MetaMask
+            // This prevents the automatic wallet popup
+            setAccount(storedAccount);
+            
+            // The actual verification will happen when the user interacts with
+            // wallet-related functionality, which will trigger proper connection
           }
         } catch (error) {
           console.error("Error checking wallet connection:", error);

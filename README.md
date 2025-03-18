@@ -1,69 +1,80 @@
-# Welcome to your Lovable project
+# EduBounty 🎓💰
 
-## Project info
+A decentralized platform revolutionizing education through blockchain-powered bounties and collaborative learning.
 
-**URL**: https://lovable.dev/projects/a9ebdcfe-bae4-4f65-b743-aa07ae55cd9b
+## 🌟 Overview
 
-## How can I edit this code?
+EduBounty is an innovative blockchain-based platform that connects students, educators, and knowledge seekers through a unique bounty system. Users can post educational queries with crypto rewards, while experts and educators can earn by providing quality solutions.
 
-There are several ways of editing your application.
+## ✨ Key Features
 
-**Use Lovable**
+- 🔗 Blockchain-powered bounty system
+- 💡 Post educational queries with crypto rewards
+- 👥 Connect with expert educators
+- 🔒 Secure and transparent transactions
+- 📱 User-friendly dashboard
+- 🌐 Decentralized verification system
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/a9ebdcfe-bae4-4f65-b743-aa07ae55cd9b) and start prompting.
+## 🛠️ Tech Stack
 
-Changes made via Lovable will be committed automatically to this repo.
+- **Frontend:**
+  - React with TypeScript
+  - Tailwind CSS
+  - shadcn-ui
+  - Vite
 
-**Use your preferred IDE**
+- **Blockchain:**
+  - Ethereum Smart Contracts
+  - Web3.js
+  - MetaMask integration
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## 🚀 Getting Started
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+1. **Clone the repository**
+```bash
+git clone https://github.com/sharmapranay38/Edu-Chain-Sem-3.git
+cd Edu-Chain-Sem-3
+```
 
-Follow these steps:
+2. **Install dependencies**
+```bash
+npm install
+```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+3. **Start the development server**
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+4. **Connect your MetaMask wallet**
+- Ensure MetaMask is installed in your browser
+- Connect to the appropriate network
+- Start interacting with the platform!
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## 💻 Development Setup
 
-**Use GitHub Codespaces**
+Make sure you have the following installed:
+- Node.js & npm - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- MetaMask browser extension
+- A code editor (VS Code recommended)
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## 🤝 Contributing
+- [Pranay Sharma](https://github.com/sharmapranay38)
+- [Pushkar Aggarwal](https://github.com/pushkar1713)
 
-## What technologies are used for this project?
+We welcome contributions! Feel free to:
+- Submit bug reports
+- Propose new features
+- Create pull requests
 
-This project is built with .
+## 📝 License
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+This project is licensed under the MIT License.
 
-## How can I deploy this project?
+## 🔗 Links
 
-Simply open [Lovable](https://lovable.dev/projects/a9ebdcfe-bae4-4f65-b743-aa07ae55cd9b) and click on Share -> Publish.
+- [GitHub Repository](https://github.com/sharmapranay38/Edu-Chain-Sem-3)
+- [Live Demo](Coming soon!)
 
-## I want to use a custom domain - is that possible?
-
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+---
+Built with ❤️ by @Hacktastic on the event of EDU Chain SEM 3

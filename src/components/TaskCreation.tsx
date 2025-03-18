@@ -180,10 +180,10 @@ const TaskCreation: React.FC = () => {
         <div className="container mx-auto px-4 md:px-6">
           <div className="flex items-center justify-between">
             <a href="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
-                <span className="text-white font-semibold">EB</span>
-              </div>
-              <span className="font-semibold text-lg">EduBounty</span>
+            <div className="flex items-center gap-2">
+              <img src="/favicon.ico" alt="Logo" className="h-8 w-8" />
+              <h1 className="text-xl font-bold">EduBounty</h1>
+            </div>
             </a>
 
             {account && (

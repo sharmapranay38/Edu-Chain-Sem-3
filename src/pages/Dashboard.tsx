@@ -315,7 +315,7 @@ const Dashboard = () => {
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
               <img src="/favicon.ico" alt="Logo" className="h-8 w-8" />
-              <h1 className="text-xl font-bold">EduChain</h1>
+              <h1 className="text-xl font-bold">EduBounty</h1>
             </div>
             <div className="flex items-center gap-4">
               <Button

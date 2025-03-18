@@ -28,7 +28,8 @@ class TaskService {
   private eduToken: ethers.Contract | null = null;
 
   private constructor() {
-    this.initializeProvider();
+    // Do not initialize provider automatically
+    // We'll initialize it only when needed
   }
 
   public static getInstance(): TaskService {
@@ -39,83 +40,50 @@ class TaskService {
   }
 
   private async initializeProvider(
-    forceDirect: boolean = false
+    forceDirect: boolean = false,
+    requestAccounts: boolean = false
   ): Promise<void> {
     try {
       // If we already have an initialized provider, no need to do it again
       if (this.isInitialized() && !forceDirect) return;
 
       if (window.ethereum) {
-        // Request account access if needed
-        await window.ethereum.request({ method: "eth_requestAccounts" });
-
-        // Get provider
+        // Get provider without requesting accounts
         this.provider = new ethers.providers.Web3Provider(window.ethereum);
 
         // Check if we're on the right network
         const network = await this.provider.getNetwork();
-        if (network.chainId !== CHAIN_ID) {
-          console.log(`Switching to chain ID: ${CHAIN_ID}`);
-          try {
-            // Try to switch to the right network
-            await window.ethereum.request({
-              method: "wallet_switchEthereumChain",
-              params: [{ chainId: `0x${CHAIN_ID.toString(16)}` }],
-            });
 
-            // Re-initialize provider after network switch
-            this.provider = new ethers.providers.Web3Provider(window.ethereum);
-          } catch (switchError: any) {
-            console.error("Failed to switch networks:", switchError);
+        // Only proceed with account checking if explicitly requested
+        if (requestAccounts) {
+          // Request account access
+          await window.ethereum.request({ method: "eth_requestAccounts" });
+          
+          // Check if we have an account after requesting
+          const accounts = await this.provider.listAccounts();
+          if (accounts.length > 0) {
+            // Initialize contracts only if we have an account
+            const signer = this.provider.getSigner();
+            this.taskManager = new ethers.Contract(
+              CONTRACT_ADDRESS,
+              TASK_MANAGER_ABI,
+              signer
+            );
+            this.eduToken = new ethers.Contract(
+              EDU_TOKEN_ADDRESS,
+              ERC20_ABI,
+              signer
+            );
 
-            // If the network isn't added to MetaMask, add it
-            if (switchError.code === 4902) {
-              try {
-                await window.ethereum.request({
-                  method: "wallet_addEthereumChain",
-                  params: [
-                    {
-                      chainId: `0x${CHAIN_ID.toString(16)}`,
-                      chainName: "Open Campus Codex",
-                      rpcUrls: [RPC_URL],
-                      blockExplorerUrls: ["https://sepolia.etherscan.io"],
-                      nativeCurrency: {
-                        name: "Sepolia Ether",
-                        symbol: "ETH",
-                        decimals: 18,
-                      },
-                    },
-                  ],
-                });
-
-                // Re-initialize provider after adding network
-                this.provider = new ethers.providers.Web3Provider(
-                  window.ethereum
-                );
-              } catch (addError) {
-                console.error("Failed to add network:", addError);
-                throw new Error("Failed to add network to wallet");
-              }
-            } else {
-              throw new Error("Failed to switch to the correct network");
-            }
+            console.log("TaskService initialized successfully with wallet");
+          } else {
+            // If we requested accounts but don't have any, something went wrong
+            throw new Error("No accounts available after requesting access");
           }
+        } else {
+          // No account access requested, so we don't initialize contracts
+          console.log("TaskService initialized without wallet connection");
         }
-
-        // Initialize contracts
-        const signer = this.provider.getSigner();
-        this.taskManager = new ethers.Contract(
-          CONTRACT_ADDRESS,
-          TASK_MANAGER_ABI,
-          signer
-        );
-        this.eduToken = new ethers.Contract(
-          EDU_TOKEN_ADDRESS,
-          ERC20_ABI,
-          signer
-        );
-
-        console.log("TaskService initialized successfully with wallet");
       } else {
         throw new Error(
           "No Ethereum wallet detected. Please install MetaMask."
@@ -129,17 +97,27 @@ class TaskService {
   }
 
   // Reset provider to ensure fresh connection
-  public async resetProvider() {
+  public async resetProvider(requestAccounts: boolean = false) {
     this.provider = null;
     this.taskManager = null;
     this.eduToken = null;
-    await this.initializeProvider();
+    await this.initializeProvider(false, requestAccounts);
     return this.isInitialized();
   }
 
   // Check if service is properly initialized
   public isInitialized(): boolean {
     return !!this.provider && !!this.taskManager && !!this.eduToken;
+  }
+
+  // Ensure wallet is connected before proceeding
+  private async ensureWalletConnected(): Promise<void> {
+    if (!this.isInitialized()) {
+      await this.initializeProvider(false, true);
+      if (!this.isInitialized()) {
+        throw new Error("Failed to connect wallet");
+      }
+    }
   }
 
   // Create a new task with direct approach to bypass RPC errors
@@ -149,14 +127,8 @@ class TaskService {
     reward: string
   ): Promise<boolean> {
     try {
-      // Force reinitialize with direct RPC connection to avoid MetaMask issues
-      await this.initializeProvider(true);
-
-      if (!this.isInitialized()) {
-        throw new Error(
-          "TaskService not initialized - wallet may not be connected"
-        );
-      }
+      // Ensure wallet is connected
+      await this.ensureWalletConnected();
 
       // Print debug information
       const signer = this.provider!.getSigner();
@@ -289,12 +261,8 @@ class TaskService {
 
   // Complete a task
   public async completeTask(taskId: number): Promise<boolean> {
-    if (!this.isInitialized()) {
-      await this.initializeProvider();
-      if (!this.isInitialized()) {
-        throw new Error("TaskService not initialized");
-      }
-    }
+    // Ensure wallet is connected
+    await this.ensureWalletConnected();
 
     try {
       const tx = await this.taskManager!.completeTask(taskId, {
@@ -311,12 +279,8 @@ class TaskService {
 
   // Get all tasks
   public async getAllTasks(): Promise<Task[]> {
-    if (!this.isInitialized()) {
-      await this.initializeProvider();
-      if (!this.isInitialized()) {
-        throw new Error("TaskService not initialized");
-      }
-    }
+    // Ensure wallet is connected
+    await this.ensureWalletConnected();
 
     try {
       const taskCount = await this.taskManager!.taskCounter();
@@ -350,12 +314,8 @@ class TaskService {
 
   // Get a specific task
   public async getTask(taskId: number): Promise<Task> {
-    if (!this.isInitialized()) {
-      await this.initializeProvider();
-      if (!this.isInitialized()) {
-        throw new Error("TaskService not initialized");
-      }
-    }
+    // Ensure wallet is connected
+    await this.ensureWalletConnected();
 
     try {
       const task = await this.taskManager!.tasks(taskId);
@@ -377,12 +337,8 @@ class TaskService {
 
   // Get EDU token balance
   public async getEduTokenBalance(address: string): Promise<string> {
-    if (!this.isInitialized()) {
-      await this.initializeProvider();
-      if (!this.isInitialized()) {
-        throw new Error("TaskService not initialized");
-      }
-    }
+    // Ensure wallet is connected
+    await this.ensureWalletConnected();
 
     try {
       // Use a simpler approach to get the balance

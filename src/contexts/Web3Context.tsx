@@ -56,7 +56,7 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
   const targetChainId = 656476; // Open Campus Codex testnet
   const isCorrectNetwork = chainId === targetChainId;
 
-  // Initialize provider and contracts
+  // Initialize provider and contracts without requesting accounts
   const initializeProvider = async () => {
     if (window.ethereum) {
       try {
@@ -75,27 +75,8 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
         const network = await web3Provider.getNetwork();
         setChainId(network.chainId);
 
-        // Initialize contracts
-        const signer = web3Provider.getSigner();
-        const taskManagerContract = new ethers.Contract(
-          CONTRACT_ADDRESS,
-          TASK_MANAGER_ABI,
-          signer
-        );
-        const eduTokenContract = new ethers.Contract(
-          EDU_TOKEN_ADDRESS,
-          ERC20_ABI,
-          signer
-        );
-
-        setTaskManager(taskManagerContract);
-        setEduToken(eduTokenContract);
-
-        // Check if already connected
-        const accounts = await web3Provider.listAccounts();
-        if (accounts.length > 0) {
-          setAccount(accounts[0]);
-        }
+        // We're not checking for accounts or initializing contracts here anymore
+        // This will prevent the automatic wallet connection popup
       } catch (error) {
         console.error("Failed to initialize provider:", error);
       }
@@ -114,15 +95,33 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
     setIsConnecting(true);
 
     try {
-      // Request account access
+      // First initialize the provider without requesting accounts
+      await initializeProvider();
+      
+      // Then request account access
       const accounts = await window.ethereum.request({
         method: "eth_requestAccounts",
       });
       setAccount(accounts[0]);
 
-      // Ensure provider is initialized
-      if (!provider) {
-        await initializeProvider();
+      // Initialize contracts with the connected account
+      if (provider) {
+        const signer = provider.getSigner();
+        const taskManagerContract = new ethers.Contract(
+          CONTRACT_ADDRESS,
+          TASK_MANAGER_ABI,
+          signer
+        );
+        const eduTokenContract = new ethers.Contract(
+          EDU_TOKEN_ADDRESS,
+          ERC20_ABI,
+          signer
+        );
+
+        setTaskManager(taskManagerContract);
+        setEduToken(eduTokenContract);
+      } else {
+        throw new Error("Provider not initialized");
       }
     } catch (error) {
       console.error("Failed to connect wallet:", error);
@@ -135,6 +134,11 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
   const disconnectWallet = () => {
     setAccount(null);
     setEduTokenBalance(null);
+    setTaskManager(null);
+    setEduToken(null);
+    
+    // Redirect to homepage
+    window.location.href = "/";
   };
 
   // Switch network
@@ -225,8 +229,8 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
       window.ethereum.on("accountsChanged", handleAccountsChanged);
       window.ethereum.on("chainChanged", handleChainChanged);
 
-      // Initialize on mount
-      initializeProvider();
+      // We no longer initialize the provider automatically
+      // This prevents the wallet popup on page load
 
       // Cleanup event listeners on unmount
       return () => {

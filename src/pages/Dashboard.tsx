@@ -3,11 +3,28 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Award, ArrowRight, Wallet, Plus, Loader2 } from "lucide-react";
+import { 
+  Clock, 
+  Award, 
+  ArrowRight, 
+  Wallet, 
+  Plus, 
+  Loader2, 
+  LogOut,
+  ChevronDown 
+} from "lucide-react";
 import { useWeb3 } from "@/contexts/Web3Context";
 import taskService from "@/services/TaskService";
 import { toast } from "@/components/ui/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export interface Task {
   id: number;
@@ -69,7 +86,7 @@ const TaskCard: React.FC<{
 };
 
 const Dashboard = () => {
-  const { account, isCorrectNetwork, switchNetwork, eduTokenBalance, refreshBalance } = useWeb3();
+  const { account, isCorrectNetwork, switchNetwork, eduTokenBalance, refreshBalance, disconnectWallet } = useWeb3();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
@@ -194,7 +211,7 @@ const Dashboard = () => {
     setLoading(true);
     try {
       // Reset the TaskService provider to ensure fresh connection
-      await taskService.resetProvider();
+      await taskService.resetProvider(true);
       
       // Refresh balance
       await refreshBalance();
@@ -219,6 +236,10 @@ const Dashboard = () => {
     }
   };
 
+  const handleLogout = () => {
+    disconnectWallet();
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <header className="fixed top-0 w-full z-50 py-2 glass">
@@ -241,14 +262,35 @@ const Dashboard = () => {
                     <span>{eduTokenBalance || "0"} EDU</span>
                   )}
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2"
-                >
-                  <Wallet size={16} />
-                  {account.slice(0, 6)}...{account.slice(-4)}
-                </Button>
+                
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-2"
+                    >
+                      <Wallet size={16} />
+                      {account.slice(0, 6)}...{account.slice(-4)}
+                      <ChevronDown size={14} />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Wallet</DropdownMenuLabel>
+                    <DropdownMenuItem className="flex items-center gap-2">
+                      <Award size={14} className="text-yellow-500" />
+                      <span>{eduTokenBalance || "0"} EDU</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem 
+                      className="flex items-center gap-2 text-red-500 focus:text-red-500" 
+                      onClick={handleLogout}
+                    >
+                      <LogOut size={14} />
+                      <span>Logout</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             )}
           </div>

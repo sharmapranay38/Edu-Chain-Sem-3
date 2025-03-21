@@ -74,7 +74,7 @@ This project is licensed under the MIT License.
 ## 🔗 Links
 
 - [GitHub Repository](https://github.com/sharmapranay38/Edu-Chain-Sem-3)
-- [Live Demo](Coming soon!)
+- [Live Demo](https://edu-chain-sem-3.onrender.com/)
 
 ---
 Built with ❤️ by @Hacktastic on the event of EDU Chain SEM 3
